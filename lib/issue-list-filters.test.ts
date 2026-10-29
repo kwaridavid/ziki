@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseBugListFilters, showsAllProjects } from "./issue-list-filters";
+import {
+  mineIssuesHref,
+  parseBugListFilters,
+  showsAllProjects,
+} from "./issue-list-filters";
+import { FINISHED_STATUS_FILTER } from "./issue-state";
 
 const tagTypes = [
   { id: "t1", name: "Design" },
@@ -189,5 +194,42 @@ describe("workspace-wide ?project=all view", () => {
     // `project` is a view override handled by the list page, not a row filter,
     // so the export parser must keep producing the same where for it.
     expect(parse({ project: "all" }).where).toEqual(parse({}).where);
+  });
+});
+
+describe("mineIssuesHref (#591)", () => {
+  const paramsOf = (href: string) =>
+    Object.fromEntries(new URLSearchParams(href.split("?")[1]));
+
+  it("opens the whole workspace, every status, duplicates included", () => {
+    expect(mineIssuesHref("assigned")).toBe(
+      "/issues?mine=assigned&status=all&project=all&duplicates=show",
+    );
+    // The row filters the link produces are exactly the dashboard's count
+    // query: no status clause, no project scope, no duplicate exclusion.
+    expect(parse(paramsOf(mineIssuesHref("assigned"))).where).toEqual({
+      isDeleted: false,
+      assigneeId: "u1",
+    });
+    expect(parse(paramsOf(mineIssuesHref("created"))).where).toEqual({
+      isDeleted: false,
+      reporterId: "u1",
+    });
+  });
+
+  it("can open the finished set the Resolved issues card counts", () => {
+    const href = mineIssuesHref("assigned", FINISHED_STATUS_FILTER);
+    expect(href).toBe(
+      "/issues?mine=assigned&status=finished&project=all&duplicates=show",
+    );
+    expect(parse(paramsOf(href)).where).toEqual({
+      isDeleted: false,
+      assigneeId: "u1",
+      status: { in: ["resolved", "closed"] },
+    });
+  });
+
+  it("keeps the list page's workspace-wide override", () => {
+    expect(showsAllProjects(paramsOf(mineIssuesHref("assigned")).project)).toBe(true);
   });
 });

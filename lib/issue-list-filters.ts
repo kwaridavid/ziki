@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { severities } from "@/lib/validations/issue";
-import { statusFilterWhere } from "@/lib/issue-state";
+import { FINISHED_STATUS_FILTER, statusFilterWhere } from "@/lib/issue-state";
 import { boundSearchTerm, escapeSearchQuery, toSingleQueryParam } from "@/lib/search";
 import { MILESTONE_PARAM, milestoneWhere, parseMilestoneFilter } from "@/lib/milestones";
 import {
@@ -11,7 +11,7 @@ import {
 } from "@/lib/mine-filter";
 import { parseTagFilter, tagTypeIds } from "@/lib/tag-filter";
 import { parseBugSort, type BugSortOption } from "@/lib/issues-sort";
-import { DUPLICATES_PARAM, duplicatesWhere, parseShowDuplicates } from "@/lib/duplicates";
+import { DUPLICATES_PARAM, SHOW_DUPLICATES, duplicatesWhere, parseShowDuplicates } from "@/lib/duplicates";
 import { parseProjectAreaFilter, projectAreaFilterWhere, type ProjectAreaOption } from "@/lib/project-area-filter";
 
 export type RawParams = Record<string, string | string[] | undefined>;
@@ -36,6 +36,28 @@ export function showsAllProjects(
   raw: string | string[] | undefined,
 ): boolean {
   return toSingleQueryParam(raw) === PROJECT_ALL;
+}
+
+/**
+ * A link to the Issues list showing exactly the workspace-wide set the
+ * dashboard counts for one "Show" view (#591): every status, every project and
+ * duplicates included. A bare `/issues?mine=` lands on the Inbox instead,
+ * which hides resolved work, narrows to the active project and keeps only
+ * escalated issues, so the badge and the list it opened disagreed.
+ *
+ * `status` is `all` for the totals or `finished` for the resolved-work card.
+ */
+export function mineIssuesHref(
+  mine: MineFilter,
+  status: "all" | typeof FINISHED_STATUS_FILTER = "all",
+): string {
+  const params = new URLSearchParams({
+    mine,
+    status,
+    [PROJECT_ALL_PARAM]: PROJECT_ALL,
+    [DUPLICATES_PARAM]: SHOW_DUPLICATES,
+  });
+  return `/issues?${params.toString()}`;
 }
 
 /**

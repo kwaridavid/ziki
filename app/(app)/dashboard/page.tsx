@@ -14,7 +14,7 @@ import {
   DashboardAgents,
   type DashboardAgentView,
 } from "@/components/dashboard-agents";
-import { OverviewStatCards, type OverviewStat } from "@/components/overview/stat-cards";
+import { OverviewStatCards } from "@/components/overview/stat-cards";
 import {
   AssignedIssuesTable,
   type OverviewAssignedIssue,
@@ -25,7 +25,7 @@ import {
   pointsThisWeek,
   type PointHistoryEntry,
 } from "@/lib/points/history";
-import { formatPoints, TARGET_POINTS } from "@/lib/points/rules";
+import { buildDashboardStats } from "@/lib/dashboard-stats";
 import { prisma } from "@/lib/prisma";
 import { openIssueStages } from "@/lib/issue-stage";
 
@@ -36,55 +36,6 @@ function firstName(name: string | null | undefined, email: string | null | undef
   if (trimmed) return trimmed.split(/\s+/)[0] ?? trimmed;
   const local = email?.split("@")[0]?.trim();
   return local || "there";
-}
-
-function buildStats(input: {
-  overview: WorkspaceOverview;
-  weekPoints: number;
-  createdLast30: number;
-  highPriorityAssigned: number;
-  resolvedAssigned: number;
-}): OverviewStat[] {
-  const { overview, weekPoints, createdLast30, highPriorityAssigned, resolvedAssigned } = input;
-  const toGo = Math.max(0, TARGET_POINTS - weekPoints);
-  const assigned = overview.assignedToMe;
-  const resolvedPct =
-    assigned === 0 ? 0 : Math.min(100, Math.round((resolvedAssigned / assigned) * 100));
-
-  return [
-    {
-      label: "Points",
-      value: formatPoints(overview.points.points),
-      href: "/workers",
-      chip: weekPoints >= TARGET_POINTS ? "Goal met" : `${formatPoints(toGo)} to go`,
-      chipTone: weekPoints >= TARGET_POINTS ? "ok" : "tint",
-      note: "500 required this week",
-    },
-    {
-      label: "Created by me",
-      value: String(overview.reportedByMe),
-      href: "/issues?mine=created",
-      chip: createdLast30 > 0 ? `+${createdLast30}` : "0",
-      chipTone: createdLast30 > 0 ? "ok" : "chip",
-      note: "in the last 30 days",
-    },
-    {
-      label: "Assigned to me",
-      value: String(assigned),
-      href: "/issues?mine=assigned",
-      chip: String(highPriorityAssigned),
-      chipTone: highPriorityAssigned > 0 ? "bad" : "chip",
-      note: "high priority",
-    },
-    {
-      label: "Resolved issues",
-      value: String(resolvedAssigned),
-      href: "/issues?mine=assigned&status=finished",
-      chip: `${resolvedPct}%`,
-      chipTone: "chip",
-      note: "of issues assigned to me",
-    },
-  ];
 }
 
 async function loadAssignedIssues(
@@ -218,8 +169,10 @@ export default async function DashboardPage() {
   }));
 
   const weekPoints = pointsThisWeek(historyEntries, now);
-  const stats = buildStats({
-    overview,
+  const stats = buildDashboardStats({
+    points: overview.points.points,
+    reportedByMe: overview.reportedByMe,
+    assignedToMe: overview.assignedToMe,
     weekPoints,
     createdLast30,
     highPriorityAssigned,
